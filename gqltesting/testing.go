@@ -27,6 +27,7 @@ type Test struct {
 
 // RunTests runs the given GraphQL test cases as subtests.
 func RunTests(t *testing.T, tests []*Test) {
+	t.Helper()
 	if len(tests) == 1 {
 		RunTest(t, tests[0])
 		return
@@ -34,6 +35,7 @@ func RunTests(t *testing.T, tests []*Test) {
 
 	for i, test := range tests {
 		t.Run(strconv.Itoa(i+1), func(t *testing.T) {
+			t.Helper()
 			RunTest(t, test)
 		})
 	}
@@ -41,6 +43,7 @@ func RunTests(t *testing.T, tests []*Test) {
 
 // RunTest runs a single GraphQL test case.
 func RunTest(t *testing.T, test *Test) {
+	t.Helper()
 	if test.Context == nil {
 		test.Context = context.Background()
 	}
@@ -86,6 +89,7 @@ func formatJSON(data []byte) ([]byte, error) {
 }
 
 func checkErrors(t *testing.T, want, got []*errors.QueryError) {
+	t.Helper()
 	sortErrors(want)
 	sortErrors(got)
 

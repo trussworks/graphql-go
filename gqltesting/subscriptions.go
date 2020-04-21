@@ -30,12 +30,14 @@ type TestSubscription struct {
 
 // RunSubscribes runs the given GraphQL subscription test cases as subtests.
 func RunSubscribes(t *testing.T, tests []*TestSubscription) {
+	t.Helper()
 	for i, test := range tests {
 		if test.Name == "" {
 			test.Name = strconv.Itoa(i + 1)
 		}
 
 		t.Run(test.Name, func(t *testing.T) {
+			t.Helper()
 			RunSubscribe(t, test)
 		})
 	}
@@ -43,6 +45,7 @@ func RunSubscribes(t *testing.T, tests []*TestSubscription) {
 
 // RunSubscribe runs a single GraphQL subscription test case.
 func RunSubscribe(t *testing.T, test *TestSubscription) {
+	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -92,6 +95,7 @@ func RunSubscribe(t *testing.T, test *TestSubscription) {
 }
 
 func checkErrorStrings(t *testing.T, expected, actual []*errors.QueryError) {
+	t.Helper()
 	expectedCount, actualCount := len(expected), len(actual)
 
 	if expectedCount != actualCount {
