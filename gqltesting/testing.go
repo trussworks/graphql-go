@@ -5,9 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os/exec"
+	"path"
 	"reflect"
 	"sort"
 	"strconv"
+	"sync"
 	"testing"
 
 	graphql "github.com/graph-gophers/graphql-go"
@@ -39,6 +43,9 @@ func RunTests(t *testing.T, tests []*Test) {
 	}
 }
 
+var diffAvailableOnSystem bool
+var checkDiffOnce sync.Once
+
 // RunTest runs a single GraphQL test case.
 func RunTest(t *testing.T, test *Test) {
 	if test.Context == nil {
@@ -67,10 +74,64 @@ func RunTest(t *testing.T, test *Test) {
 	}
 
 	if !bytes.Equal(got, want) {
-		t.Logf("got:  %s", got)
-		t.Logf("want: %s", want)
+		// ONCE, check to see if diff is on this system.
+		checkDiffOnce.Do(func() {
+			_, err := exec.LookPath("diff")
+			if err == nil {
+				diffAvailableOnSystem = true
+			}
+		})
+
+		if !diffAvailableOnSystem {
+			t.Logf("got:  %s", got)
+			t.Logf("want: %s", want)
+		} else {
+			// Run diff on the output so that it's possible to tell what changed.
+			diff, err := diffJSON(want, got)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			t.Logf("Did not get what we want:\n%s", diff)
+		}
+
 		t.Fail()
 	}
+}
+
+func diffJSON(expected []byte, received []byte) (string, error) {
+
+	// write two files and call diff on them
+	tmpDir, err := ioutil.TempDir("", "graphql-go-diff")
+	if err != nil {
+		return "", err
+	}
+
+	expectedPath := path.Join(tmpDir, "expected.json")
+	receivedPath := path.Join(tmpDir, "received.json")
+
+	err = ioutil.WriteFile(expectedPath, expected, 0644)
+	if err != nil {
+		return "", err
+	}
+
+	err = ioutil.WriteFile(receivedPath, received, 0644)
+	if err != nil {
+		return "", err
+	}
+
+	diffCmd := exec.Command("diff", "-u", "-Lexpected.json", "-Lactual.json", expectedPath, receivedPath)
+	diffOutput, err := diffCmd.Output()
+
+	if err == nil {
+		return "", fmt.Errorf("Unexpected error: We should only be calling diff on output that is not what was expected")
+	}
+
+	if err.Error() != "exit status 1" {
+		return "", fmt.Errorf("Unexpected error runing diff: %w", err)
+	}
+
+	return string(diffOutput), nil
 }
 
 func formatJSON(data []byte) ([]byte, error) {
@@ -78,7 +139,7 @@ func formatJSON(data []byte) ([]byte, error) {
 	if err := json.Unmarshal(data, &v); err != nil {
 		return nil, err
 	}
-	formatted, err := json.Marshal(v)
+	formatted, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return nil, err
 	}
